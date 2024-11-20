@@ -1,0 +1,39 @@
+# Ignore the virtual environment directory
+my_env/
+
+# Byte-compiled files
+*.pyc
+*.pyo
+__pycache__/
+
+# Environment variables
+.env
+*.env
+
+# Logs
+*.log
+*.out
+*.err
+
+# Database files (if applicable)
+*.sqlite3
+*.db
+
+# IDE/Editor specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Flask cache and session data
+instance/
+*.pkl
+
+# Jupyter Notebook checkpoints (if using Jupyter)
+.ipynb_checkpoints/
+
+# Compiled Python packages
+*.egg
+*.egg-info/
+dist/
+build/
