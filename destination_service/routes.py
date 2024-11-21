@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, redirect
 from flask_cors import CORS
 from flasgger import Swagger
 import uuid
@@ -9,6 +9,11 @@ swagger = Swagger(app)
 
 # In-memory storage for destinations
 destinations = {}
+
+
+@app.route('/')
+def home():
+    return redirect('/apidocs')
 
 class DestinationService:
     @staticmethod

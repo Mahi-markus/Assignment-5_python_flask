@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify,redirect
 from flask_cors import CORS
 from flasgger import Swagger
 import uuid
@@ -14,6 +14,12 @@ SECRET_KEY = 'your_secret_key_here'
 
 # In-memory token storage (in production, use a more robust solution)
 active_tokens = set()
+
+
+@app.route('/')
+def home():
+    return redirect('/apidocs')
+
 
 class AuthService:
     @staticmethod

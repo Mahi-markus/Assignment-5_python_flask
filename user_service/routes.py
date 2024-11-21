@@ -6,27 +6,50 @@ import hashlib
 import re
 import logging
 import jwt
+import json
+import os
 from datetime import datetime, timedelta
 
 app = Flask(__name__)
 CORS(app)
 
-# Swagger configuration
+# Comprehensive Swagger configuration
 swagger_config = {
     "headers": [],
     "specs": [
         {
             "endpoint": 'apispec_1',
             "route": '/apispec_1.json',
-            "rule_filter": lambda rule: True,  # all in
-            "model_filter": lambda tag: True,  # all in
+            "rule_filter": lambda rule: True,
+            "model_filter": lambda tag: True,
         }
     ],
     "static_url_path": "/flasgger_static",
     "swagger_ui": True,
-    "specs_route": "/apidocs/"
+    "specs_route": "/docs"
 }
-swagger = Swagger(app, config=swagger_config)
+
+swagger_template = {
+    "swagger": "2.0",
+    "info": {
+        "title": "User Management API",
+        "description": "API for user registration, authentication, and profile management",
+        "version": "1.0.0"
+    },
+    "basePath": "/",
+    "schemes": [
+        "http"
+    ],
+    "securityDefinitions": {
+        "Bearer": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}
+
+swagger = Swagger(app, config=swagger_config, template=swagger_template)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, 
@@ -36,11 +59,35 @@ logger = logging.getLogger(__name__)
 # Secret key for JWT token generation
 SECRET_KEY = 'your_super_secret_key_here_change_in_production'
 
-# In-memory storage for users
-users = {}
-
+# File path for storing users
+USERS_FILE = 'users.json'
 
 class UserService:
+    @staticmethod
+    def load_users():
+        """
+        Load users from JSON file
+        """
+        if not os.path.exists(USERS_FILE):
+            return {}
+        try:
+            with open(USERS_FILE, 'r') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError) as e:
+            logger.error(f"Error loading users file: {e}")
+            return {}
+
+    @staticmethod
+    def save_users(users):
+        """
+        Save users to JSON file
+        """
+        try:
+            with open(USERS_FILE, 'w') as f:
+                json.dump(users, f, indent=4)
+        except IOError as e:
+            logger.error(f"Error saving users file: {e}")
+
     @staticmethod
     def validate_email(email):
         """
@@ -64,7 +111,7 @@ class UserService:
         payload = {
             'user_id': user_id,
             'role': role,
-            'exp': datetime.utcnow() + timedelta(hours=24)  # Token expires in 24 hours
+            'exp': datetime.utcnow() + timedelta(hours=24)
         }
         return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
 
@@ -77,16 +124,19 @@ class UserService:
             payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
             return payload
         except jwt.ExpiredSignatureError:
-            return None  # Token expired
+            return None
         except jwt.InvalidTokenError:
-            return None  # Invalid token
+            return None
 
     @staticmethod
     def register_user(name, email, password, role='User'):
         """
-        Register a new user with comprehensive validation
+        Register a new user with file-based storage
         """
         logger.info(f"Attempting to register user: {email}")
+
+        # Load existing users
+        users = UserService.load_users()
 
         # Comprehensive input validation
         if not all([name, email, password]):
@@ -94,8 +144,7 @@ class UserService:
             return None, "All fields are required"
 
         if not UserService.validate_email(email):
-            logger.warning(
-                f"Registration failed: Invalid email format - {email}")
+            logger.warning(f"Registration failed: Invalid email format - {email}")
             return None, "Invalid email format"
 
         if len(password) < 8:
@@ -104,8 +153,7 @@ class UserService:
 
         # Check if email already exists
         if any(user['email'] == email for user in users.values()):
-            logger.warning(
-                f"Registration failed: Email already registered - {email}")
+            logger.warning(f"Registration failed: Email already registered - {email}")
             return None, "Email already registered"
 
         # Create user
@@ -119,6 +167,10 @@ class UserService:
             'created_at': datetime.utcnow().isoformat()
         }
         users[user_id] = user
+
+        # Save updated users
+        UserService.save_users(users)
+        
         logger.info(f"User registered successfully: {email}")
         return user_id, None
 
@@ -128,6 +180,7 @@ class UserService:
         Authenticate user and generate token
         """
         logger.info(f"Login attempt for: {email}")
+        users = UserService.load_users()
         hashed_password = UserService.hash_password(password)
         
         for user in users.values():
@@ -152,6 +205,7 @@ class UserService:
         Retrieve user profile (without sensitive information)
         """
         logger.info(f"Fetching profile for user ID: {user_id}")
+        users = UserService.load_users()
         user = users.get(user_id)
         if user:
             # Remove sensitive information before returning
@@ -175,11 +229,9 @@ class UserService:
             'schema': {
                 'type': 'object',
                 'properties': {
-                    'name': {'type': 'string',
-                    'description': 'Full name of the user'},
+                    'name': {'type': 'string', 'description': 'Full name of the user'},
                     'email': {'type': 'string', 'description': 'Email address'},
-                    'password': {'type': 'string',
-                    'description': 'Password (min 8 characters)'},
+                    'password': {'type': 'string', 'description': 'Password (min 8 characters)'},
                     'role': {
                         'type': 'string', 
                         'enum': ['User', 'Admin'],
@@ -371,8 +423,15 @@ def get_profile():
     if not payload:
         return jsonify({"error": "Invalid or expired token"}), 401
 
-    # Get user ID from token
-    user_id = payload.get('user_id')
+    # Get user ID from query parameter
+    user_id = request.args.get('user_id')
+    if not user_id:
+        return jsonify({"error": "User ID is required"}), 400
+
+    # Ensure the requester can only access their own profile
+    if user_id != payload.get('user_id'):
+        return jsonify({"error": "Unauthorized to access this profile"}), 403
+
     profile = UserService.get_user_profile(user_id)
 
     if profile:
