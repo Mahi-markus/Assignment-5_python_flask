@@ -9,9 +9,24 @@ import jwt
 import json
 import os
 from datetime import datetime, timedelta
+from dotenv import load_dotenv
+
+
+# Load environment variables from .env file
+load_dotenv()
+
+
 
 app = Flask(__name__)
 CORS(app)
+
+
+# Use the secret key from .env file
+SECRET_KEY = os.getenv('SECRET_KEY')
+
+# Ensure the secret key is set
+if not SECRET_KEY:
+    raise ValueError("SECRET_KEY is not set in the environment variables")
 
 # Comprehensive Swagger configuration
 swagger_config = {
@@ -26,7 +41,7 @@ swagger_config = {
     ],
     "static_url_path": "/flasgger_static",
     "swagger_ui": True,
-    "specs_route": "/docs"
+    "specs_route": "/"
 }
 
 swagger_template = {
@@ -56,8 +71,7 @@ logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-# Secret key for JWT token generation
-SECRET_KEY = 'your_super_secret_key_here_change_in_production'
+
 
 # File path for storing users
 USERS_FILE = 'users.json'
@@ -443,7 +457,7 @@ if __name__ == '__main__':
     # Seed an admin user
     UserService.register_user(
         "Admin User",
-        "admin@travelapi.com",
+        "admin1@travelapi.com",
         "AdminPass123!",
         "Admin"
     )

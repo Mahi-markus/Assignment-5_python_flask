@@ -14,5 +14,29 @@
         "password": "97bdfc80a41d0338fb69a40789dd4118781d24ff616802491b70b648624cd7a3",
         "role": "User",
         "created_at": "2024-11-21T12:52:19.284382"
+    },
+    "1e9e949a-a063-4572-b3b9-67227cd89160": {
+        "id": "1e9e949a-a063-4572-b3b9-67227cd89160",
+        "name": "Admin User",
+        "email": "admin1@travelapi.com",
+        "password": "a44ca5d29f6dab4320ab986479fa985b2d584b11a7da934f7e80bb1449913a07",
+        "role": "Admin",
+        "created_at": "2024-11-22T04:25:43.547261"
+    },
+    "f6eebac9-8ee0-4ab4-8928-43a5164ef1aa": {
+        "id": "f6eebac9-8ee0-4ab4-8928-43a5164ef1aa",
+        "name": "mr",
+        "email": "admin2@gmail.com",
+        "password": "97bdfc80a41d0338fb69a40789dd4118781d24ff616802491b70b648624cd7a3",
+        "role": "Admin",
+        "created_at": "2024-11-22T04:46:07.287556"
+    },
+    "44cc02db-8557-4875-8454-eb11f9d30970": {
+        "id": "44cc02db-8557-4875-8454-eb11f9d30970",
+        "name": "string",
+        "email": "string12@gmail.com",
+        "password": "97bdfc80a41d0338fb69a40789dd4118781d24ff616802491b70b648624cd7a3",
+        "role": "User",
+        "created_at": "2024-11-22T06:15:46.597164"
     }
 }
