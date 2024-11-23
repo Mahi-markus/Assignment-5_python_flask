@@ -455,12 +455,7 @@ def get_profile():
 
 if __name__ == '__main__':
     # Seed an admin user
-    UserService.register_user(
-        "Admin User",
-        "admin1@travelapi.com",
-        "AdminPass123!",
-        "Admin"
-    )
+
 
     # Add more detailed logging for startup
     logger.info("User Service starting...")
