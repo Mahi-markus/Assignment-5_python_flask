@@ -15,35 +15,41 @@ This repository contains a **Travel API** built using **Python Flask** with a mi
 ### Steps:
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/Mahi-markus/Assignment-5_python_flask.git
    cd travel-api
-   Install dependencies:
+
    ```
 
-bash
-Copy code
+   Install dependencies:
+
+```bash
+
 pip install -r requirements.txt
+```
+
 Run each service:
 
 User Service (Port: 5002):
-bash
-Copy code
-python user_service.py
-Destination Service (Port: 5001):
-bash
-Copy code
-python destination_service.py
-Authorization Service:
-bash
-Copy code
-python auth_service.py
-Access Swagger documentation:
 
-For User Service: http://localhost:5002/swagger
-For Destination Service: http://localhost:5001/swagger
-For Authorization Service: http://localhost:<port>/swagger
-Microservices Overview
+```bash
+python user_service.py
+```
+
+Destination Service (Port: 5001):
+
+```bash
+python destination_service.py
+```
+
+Authorization Service:
+
+```bash
+python auth_service.py
+```
+
+Access Swagger documentation:
 
 1. User Service (Port: 5002)
    Handles user-related operations, including login, registration, and profile management.
