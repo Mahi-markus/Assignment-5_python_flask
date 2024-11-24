@@ -144,7 +144,7 @@ Response:
 
 ```
 
-## POST /destinations
+### POST /destinations
 
 Add a new destination (Admin only).
 Headers:
@@ -161,7 +161,7 @@ json
 }
 ```
 
-## GET /destinations/<id>
+### GET /destinations/<id>
 
 Retrieve a destination by its ID.
 Response:
@@ -175,13 +175,13 @@ Response:
 }
 ```
 
-## DELETE /destinations/<id>
+### DELETE /destinations/<id>
 
 Delete a destination by its ID (Admin only).
 Headers:
 Authorization: Bearer <token>
 
-### 3. Authorization Service
+## 3. Authorization Service
 
 Handles token-based authentication and validation.
 
