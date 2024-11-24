@@ -45,7 +45,7 @@ Destination Service (Port: 5001):
 python destination_service.py
 ```
 
-Authorization Service:
+Authorization Service (Port: 5003):
 
 ```bash
 python auth_service.py
@@ -169,7 +169,7 @@ Authorization: Bearer <token>
    Handles token-based authentication and validation.
 
 Endpoints:
-POST /auth/login
+POST /login
 Generate a token for a user.
 Request Body:
 
@@ -182,7 +182,7 @@ json
 }
 ```
 
-POST /auth/validate
+POST /validate
 Validate a token and retrieve role information.
 Request Body:
 
