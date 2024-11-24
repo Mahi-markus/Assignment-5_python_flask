@@ -203,3 +203,23 @@ Response (for admin):
   "user_id": "f6eebac9-8ee0-4ab4-8928-43a5164ef1aa"
 }
 ```
+
+## For testing:
+
+```bash
+cd user_service
+pytest test_user_service.py -v
+pytest --cov=. --cov-report=term-missing
+```
+
+```bash
+cd destination_service
+pytest test_destination_service.py -v
+pytest --cov=. --cov-report=term-missing
+```
+
+```bash
+cd authentication_service
+pytest test_authentication_service.py -v
+pytest --cov=. --cov-report=term-missing
+```
