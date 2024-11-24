@@ -54,5 +54,13 @@
         "password": "97bdfc80a41d0338fb69a40789dd4118781d24ff616802491b70b648624cd7a3",
         "role": "Admin",
         "created_at": "2024-11-23T17:42:33.038711"
+    },
+    "50d45c9a-38c1-4de3-9ce3-d3074db5edb9": {
+        "id": "50d45c9a-38c1-4de3-9ce3-d3074db5edb9",
+        "name": "string",
+        "email": "string6@gmail.com",
+        "password": "97bdfc80a41d0338fb69a40789dd4118781d24ff616802491b70b648624cd7a3",
+        "role": "User",
+        "created_at": "2024-11-24T09:54:54.416937"
     }
 }

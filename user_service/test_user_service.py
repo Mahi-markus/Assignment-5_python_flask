@@ -1,29 +1,26 @@
+from typing import Generator, Dict, Any
 import pytest
 import json
 import jwt
 from datetime import datetime, timedelta
 from flask import Flask
-from flask.testing import FlaskClient
 from unittest.mock import patch, mock_open, MagicMock
-import os
+from flask.testing import FlaskClient
+from _pytest.fixtures import FixtureRequest
 
-# Assuming your main application file is named 'app.py'
-# Update this import statement to match your actual file name
-from routes import app, UserService, USERS_FILE
-
-# Get SECRET_KEY from environment or set a test key
-SECRET_KEY = os.getenv('SECRET_KEY', 'test-secret-key')
+# Import the main application code
+from routes import app, UserService, SECRET_KEY
 
 @pytest.fixture
-def client():
-    """Create a test client for the Flask application"""
+def client(request: FixtureRequest) -> Generator[FlaskClient, None, None]:
+    """Create a test client fixture"""
     app.config['TESTING'] = True
-    with app.test_client() as client:
-        yield client
+    with app.test_client() as test_client:
+        yield test_client
 
 @pytest.fixture
-def mock_users():
-    """Mock user data for testing"""
+def mock_users() -> Dict[str, Any]:
+    """Fixture for mock user data"""
     return {
         "test-uuid": {
             "id": "test-uuid",
@@ -32,158 +29,181 @@ def mock_users():
             "password": UserService.hash_password("password123"),
             "role": "User",
             "created_at": datetime.utcnow().isoformat()
+        },
+        "admin-uuid": {
+            "id": "admin-uuid",
+            "name": "Admin User",
+            "email": "admin@example.com",
+            "password": UserService.hash_password("admin123"),
+            "role": "Admin",
+            "created_at": datetime.utcnow().isoformat()
         }
     }
 
 @pytest.fixture
-def mock_file_operations(mock_users):
-    """Mock file operations for users.json"""
+def mock_json_file(mock_users: Dict[str, Any]) -> Generator[None, None, None]:
+    """Mock the JSON file operations"""
     with patch("builtins.open", mock_open(read_data=json.dumps(mock_users))):
         yield
 
 class TestUserService:
-    def test_validate_email_valid(self):
-        """Test email validation with valid email"""
-        assert UserService.validate_email("test@example.com") is True
+    """Test cases for UserService class"""
 
-    def test_validate_email_invalid(self):
-        """Test email validation with invalid email"""
-        assert UserService.validate_email("invalid-email") is False
+    def test_validate_email(self) -> None:
+        """Test email validation"""
+        assert UserService.validate_email("valid@example.com") == True
+        assert UserService.validate_email("invalid-email") == False
+        assert UserService.validate_email("") == False
 
-    def test_hash_password(self):
+    def test_hash_password(self) -> None:
         """Test password hashing"""
-        password = "password123"
+        password = "test123"
         hashed = UserService.hash_password(password)
         assert isinstance(hashed, str)
         assert len(hashed) == 64  # SHA-256 produces 64 character hex string
+        assert hashed == UserService.hash_password(password)  # Consistent hashing
 
-    def test_generate_token(self):
+    def test_generate_token(self) -> None:
         """Test JWT token generation"""
-        user_id = "test-uuid"
+        user_id = "test-id"
         role = "User"
         token = UserService.generate_token(user_id, role)
-        decoded = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-        assert decoded['user_id'] == user_id
-        assert decoded['role'] == role
+        
+        # Decode and verify token
+        payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+        assert payload['user_id'] == user_id
+        assert payload['role'] == role
+        assert 'exp' in payload
 
-    def test_validate_token_valid(self):
-        """Test token validation with valid token"""
+class TestAuthEndpoints:
+    """Test cases for authentication endpoints"""
+
+    def test_register_success(self, client: FlaskClient, mock_json_file: None) -> None:
+        """Test successful user registration"""
+        with patch('uuid.uuid4', return_value="new-test-uuid"):
+            response = client.post('/register', json={
+                "name": "New User",
+                "email": "new@example.com",
+                "password": "password123"
+            })
+            
+            assert response.status_code == 201
+            data = json.loads(response.data)
+            assert data["id"] == "new-test-uuid"
+            assert "message" in data
+
+    def test_register_invalid_data(self, client: FlaskClient) -> None:
+        """Test registration with invalid data"""
+        # Test missing fields
+        response = client.post('/register', json={})
+        assert response.status_code == 400
+
+        # Test invalid email
+        response = client.post('/register', json={
+            "name": "Test User",
+            "email": "invalid-email",
+            "password": "password123"
+        })
+        assert response.status_code == 400
+
+        # Test short password
+        response = client.post('/register', json={
+            "name": "Test User",
+            "email": "test@example.com",
+            "password": "short"
+        })
+        assert response.status_code == 400
+
+    def test_login_success(self, client: FlaskClient, mock_json_file: None) -> None:
+        """Test successful login"""
+        response = client.post('/login', json={
+            "email": "test@example.com",
+            "password": "password123"
+        })
+        
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert "token" in data
+        assert data["email"] == "test@example.com"
+        assert data["role"] == "User"
+
+    def test_login_failure(self, client: FlaskClient, mock_json_file: None) -> None:
+        """Test login failures"""
+        # Test wrong password
+        response = client.post('/login', json={
+            "email": "test@example.com",
+            "password": "wrongpassword"
+        })
+        assert response.status_code == 401
+
+        # Test non-existent user
+        response = client.post('/login', json={
+            "email": "nonexistent@example.com",
+            "password": "password123"
+        })
+        assert response.status_code == 401
+
+class TestProtectedEndpoints:
+    """Test cases for protected endpoints"""
+
+    def test_get_profile_authorized(self, client: FlaskClient, mock_json_file: None) -> None:
+        """Test profile access with valid token"""
         token = UserService.generate_token("test-uuid", "User")
-        payload = UserService.validate_token(token)
-        assert payload is not None
-        assert payload['user_id'] == "test-uuid"
+        response = client.get('/profile', headers={
+            'Authorization': f'Bearer {token}'
+        })
+        
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert data["email"] == "test@example.com"
+        assert data["role"] == "User"
 
-    def test_validate_token_expired(self):
-        """Test token validation with expired token"""
+    def test_get_profile_unauthorized(self, client: FlaskClient) -> None:
+        """Test profile access with invalid token"""
+        # Test missing token
+        response = client.get('/profile')
+        assert response.status_code == 401
+
+        # Test invalid token
+        response = client.get('/profile', headers={
+            'Authorization': 'Bearer invalid-token'
+        })
+        assert response.status_code == 401
+
+    def test_get_users_admin(self, client: FlaskClient, mock_json_file: None) -> None:
+        """Test admin access to users list"""
+        token = UserService.generate_token("admin-uuid", "Admin")
+        response = client.get('/users', headers={
+            'Authorization': f'Bearer {token}'
+        })
+        
+        assert response.status_code == 200
+        data = json.loads(response.data)
+        assert "users" in data
+        assert len(data["users"]) > 0
+
+    def test_get_users_non_admin(self, client: FlaskClient, mock_json_file: None) -> None:
+        """Test non-admin access to users list"""
+        token = UserService.generate_token("test-uuid", "User")
+        response = client.get('/users', headers={
+            'Authorization': f'Bearer {token}'
+        })
+        
+        assert response.status_code == 403
+
+    def test_expired_token(self, client: FlaskClient) -> None:
+        """Test access with expired token"""
+        # Create an expired token
         payload = {
             'user_id': 'test-uuid',
             'role': 'User',
             'exp': datetime.utcnow() - timedelta(hours=1)
         }
-        token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
-        assert UserService.validate_token(token) is None
-
-class TestRegistrationEndpoint:
-    def test_register_success(self, client, mock_file_operations):
-        """Test successful user registration"""
-        data = {
-            "name": "New User",
-            "email": "new@example.com",
-            "password": "password123"
-        }
-        response = client.post('/register', 
-                             json=data,
-                             content_type='application/json')
+        expired_token = jwt.encode(payload, SECRET_KEY, algorithm='HS256')
         
-        assert response.status_code == 201
-        assert 'id' in response.json
-        assert response.json['message'] == "User registered successfully"
-
-    def test_register_invalid_email(self, client):
-        """Test registration with invalid email"""
-        data = {
-            "name": "New User",
-            "email": "invalid-email",
-            "password": "password123"
-        }
-        response = client.post('/register',
-                             json=data,
-                             content_type='application/json')
-        
-        assert response.status_code == 400
-        assert response.json['error'] == "Invalid email format"
-
-    def test_register_missing_fields(self, client):
-        """Test registration with missing fields"""
-        data = {
-            "name": "New User"
-        }
-        response = client.post('/register',
-                             json=data,
-                             content_type='application/json')
-        
-        assert response.status_code == 400
-        assert response.json['error'] == "All fields are required"
-
-class TestLoginEndpoint:
-    def test_login_success(self, client, mock_file_operations, mock_users):
-        """Test successful login"""
-        data = {
-            "email": "test@example.com",
-            "password": "password123"
-        }
-        response = client.post('/login',
-                             json=data,
-                             content_type='application/json')
-        
-        assert response.status_code == 200
-        assert 'token' in response.json
-        assert response.json['email'] == data['email']
-
-    def test_login_invalid_credentials(self, client, mock_file_operations):
-        """Test login with invalid credentials"""
-        data = {
-            "email": "test@example.com",
-            "password": "wrongpassword"
-        }
-        response = client.post('/login',
-                             json=data,
-                             content_type='application/json')
-        
+        response = client.get('/profile', headers={
+            'Authorization': f'Bearer {expired_token}'
+        })
         assert response.status_code == 401
-        assert response.json['error'] == "Invalid credentials"
-
-class TestProfileEndpoint:
-    def test_get_profile_success(self, client, mock_file_operations, mock_users):
-        """Test successful profile retrieval"""
-        # Generate valid token
-        token = UserService.generate_token("test-uuid", "User")
-        
-        response = client.get('/profile?user_id=test-uuid',
-                            headers={'Authorization': f'Bearer {token}'})
-        
-        assert response.status_code == 200
-        assert response.json['email'] == "test@example.com"
-        assert 'password' not in response.json
-
-    def test_get_profile_unauthorized(self, client, mock_file_operations):
-        """Test profile retrieval with invalid token"""
-        response = client.get('/profile?user_id=test-uuid',
-                            headers={'Authorization': 'Bearer invalid-token'})
-        
-        assert response.status_code == 401
-        assert response.json['error'] == "Invalid or expired token"
-
-    def test_get_profile_wrong_user(self, client, mock_file_operations):
-        """Test profile retrieval for wrong user"""
-        # Generate token for different user
-        token = UserService.generate_token("other-uuid", "User")
-        
-        response = client.get('/profile?user_id=test-uuid',
-                            headers={'Authorization': f'Bearer {token}'})
-        
-        assert response.status_code == 403
-        assert response.json['error'] == "Unauthorized to access this profile"
-
-if __name__ == '__main__':
-    pytest.main(['-v'])
+        data = json.loads(response.data)
+        assert data["error"] == "Token has expired"

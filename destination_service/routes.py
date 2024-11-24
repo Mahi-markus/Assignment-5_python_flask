@@ -1,5 +1,5 @@
-from flask import Flask, request, jsonify
-from flask_restx import Api, Resource, fields
+from flask import Flask, request
+from flask_restx import Api, Resource
 from werkzeug.exceptions import Forbidden
 from functools import wraps
 import jwt
@@ -7,6 +7,7 @@ import os
 from datetime import datetime
 from dotenv import load_dotenv
 from flask_cors import CORS
+from swagger_models import create_api_models
 
 # Load environment variables
 load_dotenv()
@@ -14,15 +15,16 @@ load_dotenv()
 # Flask app and configuration
 app = Flask(__name__)
 CORS(app)
-app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')  # Use the same secret key as user service
+app.config['SECRET_KEY'] = os.getenv('SECRET_KEY')
 
-# Flask-RESTX API with proper security definitions
+# Flask-RESTX API setup with security definitions
 authorizations = {
     'Bearer': {
         'type': 'apiKey',
         'in': 'header',
         'name': 'Authorization',
-        'description': 'Type in the *\'Value\'* input box below: **\'Bearer &lt;JWT&gt;\'**, where JWT is the token'
+        'description': 'Type in the *\'Value\'* input box below: **\'Bearer &lt;JWT&gt;\'**, where JWT is the token',
+        'location': 'Type in the *\'Value\'* input box below: **\'Bearer &lt;JWT&gt;\'**, where JWT is the token'
     }
 }
 
@@ -35,24 +37,15 @@ api = Api(app,
 
 ns = api.namespace('destinations', description="Destination management")
 
+# Create API models
+destination_model, destination_input_model = create_api_models(api)
+
 # In-memory storage with dummy destinations
 destinations = [
-    {'id': 1, 'name': 'Paris', 'description': 'The city of light'},
-    {'id': 2, 'name': 'Tokyo', 'description': 'A bustling metropolis in Japan'},
-    {'id': 3, 'name': 'New York', 'description': 'The Big Apple'},
+    {'id': 1, 'name': 'Paris', 'description': 'The city of light' , 'location':'dhaka'},
+    {'id': 2, 'name': 'Tokyo', 'description': 'A bustling metropolis in Japan' ,'location':'dhaka'},
+    {'id': 3, 'name': 'New York', 'description': 'The Big Apple' , 'location':'dhaka'},
 ]
-
-# Models
-destination_model = api.model('Destination', {
-    'id': fields.Integer(readOnly=True, description='Unique ID of the destination'),
-    'name': fields.String(required=True, description='Name of the destination'),
-    'description': fields.String(required=True, description='Description of the destination'),
-})
-
-destination_input_model = api.model('DestinationInput', {
-    'name': fields.String(required=True, description='Name of the destination'),
-    'description': fields.String(required=True, description='Description of the destination'),
-})
 
 def validate_token(auth_header):
     """Validate JWT token using the same secret key as user service"""
@@ -121,6 +114,7 @@ class DestinationList(Resource):
             'id': max(d['id'] for d in destinations) + 1 if destinations else 1,
             'name': data['name'],
             'description': data['description'],
+            'location':data['location']
         }
         destinations.append(destination)
         return destination, 201

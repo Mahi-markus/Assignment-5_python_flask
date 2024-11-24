@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from dotenv import load_dotenv
 import requests
 from functools import wraps
+from swagger_docs import swagger, login_spec, validate_token_spec, token_info_spec
 
 # Load environment variables
 load_dotenv()
@@ -37,41 +38,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Swagger configuration remains the same
-swagger_config = {
-    "headers": [],
-    "specs": [
-        {
-            "endpoint": 'apispec_1',
-            "route": '/apispec_1.json',
-            "rule_filter": lambda rule: True,
-            "model_filter": lambda tag: True,
-        }
-    ],
-    "static_url_path": "/flasgger_static",
-    "swagger_ui": True,
-    "specs_route": "/"
-}
-
-swagger_template = {
-    "swagger": "2.0",
-    "info": {
-        "title": "Authentication Service API",
-        "description": "API for token validation and user authentication with role-based access",
-        "version": "1.0.0"
-    },
-    "basePath": "/",
-    "schemes": ["http"],
-    "securityDefinitions": {
-        "Bearer": {
-            "type": "apiKey",
-            "name": "Authorization",
-            "in": "header"
-        }
-    }
-}
-
-swagger = Swagger(app, config=swagger_config, template=swagger_template)
+# Initialize Swagger from the imported configuration
+swagger.init_app(app)
 
 class AuthService:
     @staticmethod
@@ -127,39 +95,6 @@ class AuthService:
             logger.error(f"Error storing token in session: {e}")
             return False
 
-@app.route('/login', methods=['POST'])
-@swag_from({
-    'tags': ['Authentication'],
-    'summary': 'Login and store token in session',
-    'parameters': [
-        {
-            'name': 'Authorization',
-            'in': 'header',
-            'type': 'string',
-            'required': True,
-            'description': 'JWT Token (Bearer token)'
-        }
-    ],
-    'responses': {
-        '200': {
-            'description': 'Login successful'
-        }
-    }
-})
-def login():
-    """Login endpoint to store token in session"""
-    auth_header = request.headers.get('Authorization')
-    if not auth_header:
-        return jsonify({"error": "No authorization token provided"}), 401
-
-    try:
-        token = auth_header.split(" ")[1]
-        if AuthService.store_token_in_session(token):
-            return jsonify({"message": "Login successful"}), 200
-        return jsonify({"error": "Invalid token"}), 401
-    except Exception as e:
-        return jsonify({"error": str(e)}), 401
-
 def require_auth(f):
     """Modified decorator to use session token"""
     @wraps(f)
@@ -182,6 +117,22 @@ def require_auth(f):
 
     return decorated
 
+@app.route('/login', methods=['POST'])
+@swag_from(login_spec)
+def login():
+    """Login endpoint to store token in session"""
+    auth_header = request.headers.get('Authorization')
+    if not auth_header:
+        return jsonify({"error": "No authorization token provided"}), 401
+
+    try:
+        token = auth_header.split(" ")[1]
+        if AuthService.store_token_in_session(token):
+            return jsonify({"message": "Login successful"}), 200
+        return jsonify({"error": "Invalid token"}), 401
+    except Exception as e:
+        return jsonify({"error": str(e)}), 401
+
 @app.route('/logout', methods=['POST'])
 def logout():
     """Logout endpoint to clear session"""
@@ -190,26 +141,7 @@ def logout():
 
 @app.route('/validate', methods=['GET'])
 @require_auth
-@swag_from({
-    'tags': ['Token Validation'],
-    'summary': 'Validate session token and show user permissions',
-    'description': 'Validates token and returns user role and permissions',
-    'responses': {
-        '200': {
-            'description': 'Token validation successful',
-            'schema': {
-                'type': 'object',
-                'properties': {
-                    'status': {'type': 'string'},
-                    'user_id': {'type': 'string'},
-                    'role': {'type': 'string'},
-                    'permissions': {'type': 'object'},
-                    'token_validity': {'type': 'object'}
-                }
-            }
-        }
-    }
-})
+@swag_from(validate_token_spec)
 def validate_token():
     """Validate token and return role-based information"""
     user = request.user
@@ -242,55 +174,7 @@ def validate_token():
         'token_validity': token_validity
     }), 200
 
-@app.route('/token/info', methods=['GET'])
-@require_auth
-@swag_from({
-    'tags': ['Token Information'],
-    'summary': 'Get detailed token and user information',
-    'description': 'Returns comprehensive information about token and associated user',
-    'responses': {
-        '200': {
-            'description': 'Token information retrieved successfully'
-        }
-    }
-})
-def token_info():
-    """Get detailed token and user information"""
-    user = request.user
-    token = session['token']
-    
-    # Get user details
-    user_info = AuthService.get_user_info(user['user_id'], token)
-    if not user_info:
-        return jsonify({"error": "Could not fetch user information"}), 404
 
-    # Get token validity
-    token_validity = AuthService.format_expiration_time(user['exp'])
-    
-    # Get user activity status
-    activity_status = {
-        'last_seen': datetime.utcnow().isoformat(),
-        'status': 'active',
-        'session_valid': True
-    }
-    
-    return jsonify({
-        'token_info': {
-            'user_id': user['user_id'],
-            'role': user['role'],
-            'validity': token_validity,
-            'session': activity_status
-        },
-        'user_info': user_info,
-        'access_level': {
-            'role_type': user['role'],
-            'permissions': {
-                'api_access': True,
-                'resource_access': user['role'] == 'Admin',
-                'admin_privileges': user['role'] == 'Admin'
-            }
-        }
-    }), 200
 
 if __name__ == '__main__':
     logger.info("Enhanced Authentication Service starting...")

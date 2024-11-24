@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from flasgger import Swagger, swag_from
+from swagger_config import swagger_config, swagger_template, register, login, get_users, get_profile
 import uuid
 import hashlib
 import re
@@ -25,42 +26,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 if not SECRET_KEY:
     raise ValueError("SECRET_KEY is not set in the environment variables")
 
-# Swagger configuration
-swagger_config = {
-    "headers": [],
-    "specs": [
-        {
-            "endpoint": 'apispec_1',
-            "route": '/apispec_1.json',
-            "rule_filter": lambda rule: True,
-            "model_filter": lambda tag: True,
-        }
-    ],
-    "static_url_path": "/flasgger_static",
-    "swagger_ui": True,
-    "specs_route": "/"
-}
-
-swagger_template = {
-    "swagger": "2.0",
-    "info": {
-        "title": "User Management API",
-        "description": "API for user registration, authentication, and profile management",
-        "version": "1.0.0"
-    },
-    "basePath": "/",
-    "schemes": [
-        "http"
-    ],
-    "securityDefinitions": {
-        "Bearer": {
-            "type": "apiKey",
-            "name": "Authorization",
-            "in": "header"
-        }
-    }
-}
-
+# Initialize Swagger
 swagger = Swagger(app, config=swagger_config, template=swagger_template)
 
 # Configure logging
@@ -81,17 +47,37 @@ def admin_required(f):
             return jsonify({"error": "Authorization token required"}), 401
 
         try:
-            # Extract token from "Bearer <token>"
             token = auth_header.split(' ')[1]
-            # Decode and verify token
             payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
             
-            # Check if user has admin role
             if payload.get('role') != 'Admin':
                 logger.warning(f"Access denied: User {payload.get('user_id')} attempted admin action without privileges")
                 return jsonify({"error": "Admin privileges required"}), 403
                 
-            # Add user info to request context
+            request.user = payload
+            return f(*args, **kwargs)
+            
+        except jwt.ExpiredSignatureError:
+            logger.warning("Access denied: Token expired")
+            return jsonify({"error": "Token has expired"}), 401
+        except (jwt.InvalidTokenError, IndexError) as e:
+            logger.warning(f"Access denied: Invalid token - {str(e)}")
+            return jsonify({"error": "Invalid token"}), 401
+
+    return decorated
+
+def auth_required(f):
+    """Decorator to check if the user is authenticated"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            logger.warning("Access denied: No authorization token provided")
+            return jsonify({"error": "Authorization token required"}), 401
+
+        try:
+            token = auth_header.split(' ')[1]
+            payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
             request.user = payload
             return f(*args, **kwargs)
             
@@ -151,7 +137,6 @@ class UserService:
     def get_all_users():
         """Retrieve all users (admin only)"""
         users = UserService.load_users()
-        # Remove sensitive information
         return [
             {
                 'id': user_id,
@@ -164,11 +149,30 @@ class UserService:
         ]
 
     @staticmethod
+    def get_user_profile(user_id):
+        """Retrieve user profile information"""
+        users = UserService.load_users()
+        user = users.get(user_id)
+        
+        if not user:
+            logger.warning(f"Profile not found for user ID: {user_id}")
+            return None, "User not found"
+            
+        profile = {
+            'id': user['id'],
+            'name': user['name'],
+            'email': user['email'],
+            'role': user['role'],
+            'created_at': user['created_at']
+        }
+        logger.info(f"Profile retrieved successfully for user ID: {user_id}")
+        return profile, None
+
+    @staticmethod
     def register_user(name, email, password, role='User'):
         """Register a new user"""
         logger.info(f"Attempting to register user: {email}")
 
-        # Validate input
         if not all([name, email, password]):
             logger.warning("Registration failed: Missing required fields")
             return None, "All fields are required"
@@ -181,15 +185,12 @@ class UserService:
             logger.warning("Registration failed: Password too short")
             return None, "Password must be at least 8 characters"
 
-        # Load existing users
         users = UserService.load_users()
 
-        # Check if email already exists
         if any(user['email'] == email for user in users.values()):
             logger.warning(f"Registration failed: Email already registered - {email}")
             return None, "Email already registered"
 
-        # Create new user
         user_id = str(uuid.uuid4())
         user = {
             'id': user_id,
@@ -200,7 +201,6 @@ class UserService:
             'created_at': datetime.utcnow().isoformat()
         }
 
-        # Save user
         users[user_id] = user
         UserService.save_users(users)
 
@@ -216,15 +216,12 @@ class UserService:
             logger.warning("Login failed: Missing credentials")
             return None, "Email and password are required"
 
-        # Load users and check credentials
         users = UserService.load_users()
         hashed_password = UserService.hash_password(password)
 
-        # Find user by email
         user = next((user for user in users.values() if user['email'] == email), None)
 
         if user and user['password'] == hashed_password:
-            # Generate token
             token = UserService.generate_token(user['id'], user['role'])
             logger.info(f"Login successful: {email}")
             return {
@@ -240,40 +237,7 @@ class UserService:
 
 # Register endpoint
 @app.route('/register', methods=['POST'])
-@swag_from({
-    'tags': ['User Registration'],
-    'summary': 'Register a new user',
-    'description': 'Endpoint for user registration',
-    'parameters': [
-        {
-            'name': 'body',
-            'in': 'body',
-            'required': True,
-            'schema': {
-                'type': 'object',
-                'properties': {
-                    'name': {'type': 'string'},
-                    'email': {'type': 'string'},
-                    'password': {'type': 'string'},
-                    'role': {
-                        'type': 'string',
-                        'enum': ['User', 'Admin'],
-                        'default': 'User'
-                    }
-                },
-                'required': ['name', 'email', 'password']
-            }
-        }
-    ],
-    'responses': {
-        '201': {
-            'description': 'User registered successfully'
-        },
-        '400': {
-            'description': 'Registration failed'
-        }
-    }
-})
+@swag_from(register)
 def register():
     """Register a new user endpoint"""
     if not request.is_json:
@@ -299,34 +263,7 @@ def register():
 
 # Login endpoint
 @app.route('/login', methods=['POST'])
-@swag_from({
-    'tags': ['User Authentication'],
-    'summary': 'User login',
-    'description': 'Endpoint for user login',
-    'parameters': [
-        {
-            'name': 'body',
-            'in': 'body',
-            'required': True,
-            'schema': {
-                'type': 'object',
-                'properties': {
-                    'email': {'type': 'string'},
-                    'password': {'type': 'string'}
-                },
-                'required': ['email', 'password']
-            }
-        }
-    ],
-    'responses': {
-        '200': {
-            'description': 'Login successful'
-        },
-        '401': {
-            'description': 'Authentication failed'
-        }
-    }
-})
+@swag_from(login)
 def login():
     """User login endpoint"""
     if not request.is_json:
@@ -348,28 +285,26 @@ def login():
 # Admin-only endpoint to get all users
 @app.route('/users', methods=['GET'])
 @admin_required
-@swag_from({
-    'tags': ['Admin'],
-    'summary': 'Get all users',
-    'description': 'Admin endpoint to retrieve all registered users',
-    'responses': {
-        '200': {
-            'description': 'List of all users'
-        },
-        '401': {
-            'description': 'Unauthorized access'
-        },
-        '403': {
-            'description': 'Forbidden - Admin access required'
-        }
-    },
-    'security': [{'Bearer': []}]
-})
+@swag_from(get_users)
 def get_all_users():
     """Admin endpoint to get all users"""
     logger.info(f"Admin user {request.user['user_id']} accessed all users list")
     users = UserService.get_all_users()
     return jsonify({'users': users}), 200
+
+# Profile endpoint
+@app.route('/profile', methods=['GET'])
+@auth_required
+@swag_from(get_profile)
+def get_profile():
+    """Get user profile endpoint"""
+    logger.info(f"Profile access request for user {request.user['user_id']}")
+    
+    profile, error = UserService.get_user_profile(request.user['user_id'])
+    
+    if profile:
+        return jsonify(profile), 200
+    return jsonify({"error": error}), 404
 
 if __name__ == '__main__':
     logger.info("User Service starting...")
