@@ -53,8 +53,9 @@ python auth_service.py
 
 Access Swagger documentation:
 
-1. User Service (Port: 5002)
-   Handles user-related operations, including login, registration, and profile management.
+### 1. User Service (Port: 5002)
+
+Handles user-related operations, including login, registration, and profile management.
 
 Endpoints:
 
