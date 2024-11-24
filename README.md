@@ -57,7 +57,9 @@ Access Swagger documentation:
    Handles user-related operations, including login, registration, and profile management.
 
 Endpoints:
-POST /register
+
+### POST /register
+
 Register a new user.
 Request Body:
 
@@ -70,7 +72,8 @@ json
 }
 ```
 
-POST /login
+### POST /login
+
 Authenticate a user and generate a token.
 Request Body:
 
@@ -81,7 +84,8 @@ Request Body:
 }
 ```
 
-GET /profile
+### GET /profile
+
 Retrieve the profile of the currently authenticated user.
 Headers:
 
@@ -89,7 +93,8 @@ Headers:
 Authorization: Bearer <token>
 ```
 
-GET /users
+### GET /users
+
 Retrieve all registered users (Admin only).
 Headers:
 
@@ -97,8 +102,9 @@ Headers:
 Authorization: Bearer <token>
 ```
 
-2. Destination Service (Port: 5001)
-   Manages destination-related operations, including CRUD operations for destinations.
+### 2. Destination Service (Port: 5001)
+
+Manages destination-related operations, including CRUD operations for destinations.
 
 Destination Information:
 Each destination includes:
@@ -125,7 +131,8 @@ json
 ]
 ```
 
-POST /destinations
+### POST /destinations
+
 Add a new destination (Admin only).
 Headers:
 Authorization: Bearer <token>
@@ -159,7 +166,7 @@ json
 }
 ```
 
-DELETE /destinations/<id>
+### DELETE /destinations/<id>
 
 Delete a destination by its ID (Admin only).
 Headers:
