@@ -188,23 +188,23 @@ for example:
 Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiZjZlZWJhYzktOGVlMC00YWI0LTg5MjgtNDNhNTE2NGVmMWFhIiwicm9sZSI6IkFkbWluIiwiZXhwIjoxNzMyNTU4ODU5fQ.ZzyHji3wBi5w7NceRKcbzKM5aySr123mzFmkK1ZBKHQ
 ```
 
-Response:
+Response (for admin):
 
 ```bash
 {
   "permissions": {
-    "access_level": "limited",
-    "can_create_users": false,
-    "can_delete_users": false,
-    "can_modify_roles": false,
-    "can_view_all_profiles": false
+    "access_level": "full",
+    "can_create_users": true,
+    "can_delete_users": true,
+    "can_modify_roles": true,
+    "can_view_all_profiles": true
   },
-  "role": "User",
+  "role": "Admin",
   "status": "Token is valid",
   "token_validity": {
-    "expiration": "2024-11-25T16:17:46",
-    "valid_for": "21 hours, 56 minutes"
+    "expiration": "2024-11-26T00:20:59",
+    "valid_for": "29 hours, 54 minutes"
   },
-  "user_id": "9e906a13-6991-488f-92e9-0ef269b34b5c"
+  "user_id": "f6eebac9-8ee0-4ab4-8928-43a5164ef1aa"
 }
 ```
