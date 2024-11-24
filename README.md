@@ -18,8 +18,10 @@ This repository contains a **Travel API** built using **Python Flask** with a mi
 
    ```bash
    git clone https://github.com/Mahi-markus/Assignment-5_python_flask.git
-   cd travel-api
+   ```
 
+   ```bash
+   cd Assignment-5_python_flask
    ```
 
    Install dependencies:
