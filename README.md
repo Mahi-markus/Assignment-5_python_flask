@@ -143,14 +143,10 @@ json
 }
 ```
 
-```bash
-GET /destinations/<id>
-```
+### GET /destinations/<id>
 
 Retrieve a destination by its ID.
 Response:
-
-json
 
 ```bash
 {
