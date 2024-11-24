@@ -10,16 +10,13 @@ import json
 import os
 from datetime import datetime, timedelta
 from dotenv import load_dotenv
-
+from functools import wraps
 
 # Load environment variables from .env file
 load_dotenv()
 
-
-
 app = Flask(__name__)
 CORS(app)
-
 
 # Use the secret key from .env file
 SECRET_KEY = os.getenv('SECRET_KEY')
@@ -28,7 +25,7 @@ SECRET_KEY = os.getenv('SECRET_KEY')
 if not SECRET_KEY:
     raise ValueError("SECRET_KEY is not set in the environment variables")
 
-# Comprehensive Swagger configuration
+# Swagger configuration
 swagger_config = {
     "headers": [],
     "specs": [
@@ -71,17 +68,46 @@ logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
-
-
 # File path for storing users
 USERS_FILE = 'users.json'
+
+def admin_required(f):
+    """Decorator to check if the user has admin privileges"""
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        auth_header = request.headers.get('Authorization')
+        if not auth_header:
+            logger.warning("Access denied: No authorization token provided")
+            return jsonify({"error": "Authorization token required"}), 401
+
+        try:
+            # Extract token from "Bearer <token>"
+            token = auth_header.split(' ')[1]
+            # Decode and verify token
+            payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
+            
+            # Check if user has admin role
+            if payload.get('role') != 'Admin':
+                logger.warning(f"Access denied: User {payload.get('user_id')} attempted admin action without privileges")
+                return jsonify({"error": "Admin privileges required"}), 403
+                
+            # Add user info to request context
+            request.user = payload
+            return f(*args, **kwargs)
+            
+        except jwt.ExpiredSignatureError:
+            logger.warning("Access denied: Token expired")
+            return jsonify({"error": "Token has expired"}), 401
+        except (jwt.InvalidTokenError, IndexError) as e:
+            logger.warning(f"Access denied: Invalid token - {str(e)}")
+            return jsonify({"error": "Invalid token"}), 401
+
+    return decorated
 
 class UserService:
     @staticmethod
     def load_users():
-        """
-        Load users from JSON file
-        """
+        """Load users from JSON file"""
         if not os.path.exists(USERS_FILE):
             return {}
         try:
@@ -93,9 +119,7 @@ class UserService:
 
     @staticmethod
     def save_users(users):
-        """
-        Save users to JSON file
-        """
+        """Save users to JSON file"""
         try:
             with open(USERS_FILE, 'w') as f:
                 json.dump(users, f, indent=4)
@@ -104,24 +128,18 @@ class UserService:
 
     @staticmethod
     def validate_email(email):
-        """
-        Validate email format
-        """
+        """Validate email format"""
         email_regex = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'
         return re.match(email_regex, email) is not None
 
     @staticmethod
     def hash_password(password):
-        """
-        Hash password using SHA-256
-        """
+        """Hash password using SHA-256"""
         return hashlib.sha256(password.encode()).hexdigest()
 
     @staticmethod
     def generate_token(user_id, role):
-        """
-        Generate JWT token
-        """
+        """Generate JWT token"""
         payload = {
             'user_id': user_id,
             'role': role,
@@ -130,29 +148,27 @@ class UserService:
         return jwt.encode(payload, SECRET_KEY, algorithm='HS256')
 
     @staticmethod
-    def validate_token(token):
-        """
-        Validate JWT token
-        """
-        try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=['HS256'])
-            return payload
-        except jwt.ExpiredSignatureError:
-            return None
-        except jwt.InvalidTokenError:
-            return None
+    def get_all_users():
+        """Retrieve all users (admin only)"""
+        users = UserService.load_users()
+        # Remove sensitive information
+        return [
+            {
+                'id': user_id,
+                'name': user['name'],
+                'email': user['email'],
+                'role': user['role'],
+                'created_at': user['created_at']
+            }
+            for user_id, user in users.items()
+        ]
 
     @staticmethod
     def register_user(name, email, password, role='User'):
-        """
-        Register a new user with file-based storage
-        """
+        """Register a new user"""
         logger.info(f"Attempting to register user: {email}")
 
-        # Load existing users
-        users = UserService.load_users()
-
-        # Comprehensive input validation
+        # Validate input
         if not all([name, email, password]):
             logger.warning("Registration failed: Missing required fields")
             return None, "All fields are required"
@@ -165,12 +181,15 @@ class UserService:
             logger.warning("Registration failed: Password too short")
             return None, "Password must be at least 8 characters"
 
+        # Load existing users
+        users = UserService.load_users()
+
         # Check if email already exists
         if any(user['email'] == email for user in users.values()):
             logger.warning(f"Registration failed: Email already registered - {email}")
             return None, "Email already registered"
 
-        # Create user
+        # Create new user
         user_id = str(uuid.uuid4())
         user = {
             'id': user_id,
@@ -180,56 +199,46 @@ class UserService:
             'role': role,
             'created_at': datetime.utcnow().isoformat()
         }
-        users[user_id] = user
 
-        # Save updated users
+        # Save user
+        users[user_id] = user
         UserService.save_users(users)
-        
+
         logger.info(f"User registered successfully: {email}")
         return user_id, None
 
     @staticmethod
     def login_user(email, password):
-        """
-        Authenticate user and generate token
-        """
+        """Authenticate user and generate token"""
         logger.info(f"Login attempt for: {email}")
+
+        if not email or not password:
+            logger.warning("Login failed: Missing credentials")
+            return None, "Email and password are required"
+
+        # Load users and check credentials
         users = UserService.load_users()
         hashed_password = UserService.hash_password(password)
-        
-        for user in users.values():
-            if user['email'] == email and user['password'] == hashed_password:
-                # Generate JWT token
-                token = UserService.generate_token(user['id'], user['role'])
-                logger.info(f"Successful login: {email}")
-                return {
-                    'user_id': user['id'],
-                    'name': user['name'],
-                    'email': user['email'],
-                    'role': user['role'],
-                    'token': token
-                }, None
-        
+
+        # Find user by email
+        user = next((user for user in users.values() if user['email'] == email), None)
+
+        if user and user['password'] == hashed_password:
+            # Generate token
+            token = UserService.generate_token(user['id'], user['role'])
+            logger.info(f"Login successful: {email}")
+            return {
+                'user_id': user['id'],
+                'name': user['name'],
+                'email': user['email'],
+                'role': user['role'],
+                'token': token
+            }, None
+
         logger.warning(f"Login failed for: {email}")
         return None, "Invalid credentials"
 
-    @staticmethod
-    def get_user_profile(user_id):
-        """
-        Retrieve user profile (without sensitive information)
-        """
-        logger.info(f"Fetching profile for user ID: {user_id}")
-        users = UserService.load_users()
-        user = users.get(user_id)
-        if user:
-            # Remove sensitive information before returning
-            profile = user.copy()
-            del profile['password']
-            return profile
-        logger.warning(f"Profile not found for user ID: {user_id}")
-        return None
-
-
+# Register endpoint
 @app.route('/register', methods=['POST'])
 @swag_from({
     'tags': ['User Registration'],
@@ -243,11 +252,11 @@ class UserService:
             'schema': {
                 'type': 'object',
                 'properties': {
-                    'name': {'type': 'string', 'description': 'Full name of the user'},
-                    'email': {'type': 'string', 'description': 'Email address'},
-                    'password': {'type': 'string', 'description': 'Password (min 8 characters)'},
+                    'name': {'type': 'string'},
+                    'email': {'type': 'string'},
+                    'password': {'type': 'string'},
                     'role': {
-                        'type': 'string', 
+                        'type': 'string',
                         'enum': ['User', 'Admin'],
                         'default': 'User'
                     }
@@ -258,38 +267,20 @@ class UserService:
     ],
     'responses': {
         '201': {
-            'description': 'User registered successfully',
-            'schema': {
-                'type': 'object',
-                'properties': {
-                    'id': {'type': 'string'},
-                    'message': {'type': 'string'}
-                }
-            }
+            'description': 'User registered successfully'
         },
         '400': {
-            'description': 'Registration failed',
-            'schema': {
-                'type': 'object',
-                'properties': {
-                    'error': {'type': 'string'}
-                }
-            }
+            'description': 'Registration failed'
         }
     }
 })
 def register():
     """Register a new user endpoint"""
-    # Validate JSON content type
     if not request.is_json:
-        logger.warning("Registration failed: Invalid content type")
         return jsonify({"error": "Request must be JSON"}), 400
 
     data = request.json
-
-    # Validate request data
     if not data:
-        logger.warning("Registration failed: Empty request body")
         return jsonify({"error": "Empty request body"}), 400
 
     user_id, error = UserService.register_user(
@@ -306,12 +297,12 @@ def register():
         }), 201
     return jsonify({"error": error}), 400
 
-
+# Login endpoint
 @app.route('/login', methods=['POST'])
 @swag_from({
     'tags': ['User Authentication'],
     'summary': 'User login',
-    'description': 'Endpoint for user login and token generation',
+    'description': 'Endpoint for user login',
     'parameters': [
         {
             'name': 'body',
@@ -320,8 +311,8 @@ def register():
             'schema': {
                 'type': 'object',
                 'properties': {
-                    'email': {'type': 'string', 'description': 'User email'},
-                    'password': {'type': 'string', 'description': 'User password'}
+                    'email': {'type': 'string'},
+                    'password': {'type': 'string'}
                 },
                 'required': ['email', 'password']
             }
@@ -329,42 +320,21 @@ def register():
     ],
     'responses': {
         '200': {
-            'description': 'Login successful',
-            'schema': {
-                'type': 'object',
-                'properties': {
-                    'user_id': {'type': 'string'},
-                    'name': {'type': 'string'},
-                    'email': {'type': 'string'},
-                    'role': {'type': 'string'},
-                    'token': {'type': 'string'}
-                }
-            }
+            'description': 'Login successful'
         },
         '401': {
-            'description': 'Authentication failed',
-            'schema': {
-                'type': 'object',
-                'properties': {
-                    'error': {'type': 'string'}
-                }
-            }
+            'description': 'Authentication failed'
         }
     }
 })
 def login():
     """User login endpoint"""
-    # Validate JSON content type
     if not request.is_json:
-        logger.warning("Login failed: Invalid content type")
         return jsonify({"error": "Request must be JSON"}), 400
 
     data = request.json
-
-    # Validate request data
-    if not data or not data.get('email') or not data.get('password'):
-        logger.warning("Login failed: Missing credentials")
-        return jsonify({"error": "Email and password are required"}), 400
+    if not data:
+        return jsonify({"error": "Empty request body"}), 400
 
     result, error = UserService.login_user(
         data.get('email'),
@@ -374,94 +344,33 @@ def login():
     if result:
         return jsonify(result), 200
     return jsonify({"error": error}), 401
-    
-@app.route('/profile', methods=['GET'])
+
+# Admin-only endpoint to get all users
+@app.route('/users', methods=['GET'])
+@admin_required
 @swag_from({
-    'tags': ['User Profile'],
-    'summary': 'Get user profile',
-    'description': 'Retrieve user profile by user ID',
-    'parameters': [
-        {
-            'name': 'user_id',
-            'in': 'query',
-            'type': 'string',
-            'required': True,
-            'description': 'ID of the user'
-        },
-        {
-            'name': 'Authorization',
-            'in': 'header',
-            'type': 'string',
-            'required': True,
-            'description': 'JWT Token (Bearer token)'
-        }
-    ],
+    'tags': ['Admin'],
+    'summary': 'Get all users',
+    'description': 'Admin endpoint to retrieve all registered users',
     'responses': {
         '200': {
-            'description': 'User profile retrieved successfully',
-            'schema': {
-                'type': 'object',
-                'properties': {
-                    'id': {'type': 'string'},
-                    'name': {'type': 'string'},
-                    'email': {'type': 'string'},
-                    'role': {'type': 'string'}
-                }
-            }
+            'description': 'List of all users'
         },
         '401': {
-            'description': 'Unauthorized access',
-            'schema': {
-                'type': 'object',
-                'properties': {
-                    'error': {'type': 'string'}
-                }
-            }
+            'description': 'Unauthorized access'
+        },
+        '403': {
+            'description': 'Forbidden - Admin access required'
         }
-    }
+    },
+    'security': [{'Bearer': []}]
 })
-def get_profile():
-    """Get user profile endpoint"""
-    # Check for authorization token
-    auth_header = request.headers.get('Authorization')
-    if not auth_header:
-        return jsonify({"error": "Authorization token required"}), 401
-
-    # Validate token
-    token = auth_header.split(' ')[1] if len(auth_header.split(' ')) > 1 else None
-    if not token:
-        return jsonify({"error": "Invalid token format"}), 401
-
-    # Verify token
-    payload = UserService.validate_token(token)
-    if not payload:
-        return jsonify({"error": "Invalid or expired token"}), 401
-
-    # Get user ID from query parameter
-    user_id = request.args.get('user_id')
-    if not user_id:
-        return jsonify({"error": "User ID is required"}), 400
-
-    # Ensure the requester can only access their own profile
-    if user_id != payload.get('user_id'):
-        return jsonify({"error": "Unauthorized to access this profile"}), 403
-
-    profile = UserService.get_user_profile(user_id)
-
-    if profile:
-        return jsonify(profile), 200
-    return jsonify({"error": "Profile not found"}), 404
-
+def get_all_users():
+    """Admin endpoint to get all users"""
+    logger.info(f"Admin user {request.user['user_id']} accessed all users list")
+    users = UserService.get_all_users()
+    return jsonify({'users': users}), 200
 
 if __name__ == '__main__':
-    # Seed an admin user
-
-
-    # Add more detailed logging for startup
     logger.info("User Service starting...")
-    logger.info("Listening on host 0.0.0.0, port 5002")
-
-    # Dependencies for requirements
-    # pip install flask flask-cors flasgger PyJWT
-
     app.run(host='0.0.0.0', port=5002, debug=True)
