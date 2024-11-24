@@ -33,19 +33,19 @@ pip install -r requirements.txt
 
 Run each service:
 
-User Service (Port: 5002):
+### User Service (Port: 5002):
 
 ```bash
 python user_service.py
 ```
 
-Destination Service (Port: 5001):
+### Destination Service (Port: 5001):
 
 ```bash
 python destination_service.py
 ```
 
-Authorization Service (Port: 5003):
+### Authorization Service (Port: 5003):
 
 ```bash
 python auth_service.py
@@ -117,8 +117,6 @@ GET /destinations
 Retrieve all available destinations.
 Response:
 
-json
-
 ```bash
 
 {
@@ -179,8 +177,6 @@ POST /login
 Generate a token for a user.
 Request Body:
 
-json
-
 ```bash
 {
 "username": "string",
@@ -192,8 +188,6 @@ POST /validate
 Validate a token and retrieve role information.
 Request Body:
 
-json
-
 ```bash
 {
 "token": "Bearer <JWT>"
@@ -201,8 +195,6 @@ json
 ```
 
 Response:
-
-json
 
 ```bash
 {
