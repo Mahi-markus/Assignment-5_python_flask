@@ -65,7 +65,7 @@ Register a new user.
 Request Body:
 
 ```bash
-json
+
 {
   "username": "string",
   "password": "string",
@@ -79,10 +79,8 @@ Authenticate a user and generate a token.
 Request Body:
 
 ```bash
-{
-  "username": "string",
-  "password": "string"
-}
+ "email": "admin2@gmail.com",
+  "password": "string1234"
 ```
 
 ### GET /profile
