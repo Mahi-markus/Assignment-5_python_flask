@@ -1,6 +1,6 @@
 # Travel API with Microservices
 
-This repository contains a **Travel API** built using **Python Flask** with a microservices architecture. The API manages user accounts, destinations, and authentication, all integrated with role-based access control. Swagger is used for API documentation and testing.
+This repository contains API's built using **Python Flask** with a microservices architecture. The API manages user accounts, destinations, and authentication, all integrated with role-based access control. Swagger is used for API documentation and testing.
 
 ---
 
@@ -10,7 +10,6 @@ This repository contains a **Travel API** built using **Python Flask** with a mi
 
 - Python 3.8+
 - `pip` package manager
-- Postman or any API client (optional, Swagger is included)
 
 ### Steps:
 
@@ -76,11 +75,24 @@ Request Body:
 ### POST /login
 
 Authenticate a user and generate a token.
-Request Body:
+Request Body(for example):
 
 ```bash
  "email": "admin2@gmail.com",
   "password": "string1234"
+```
+
+Response body:
+
+```bash
+{
+  "email": "admin2@gmail.com",
+  "name": "mr",
+  "role": "Admin",
+  "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX2lkIjoiZjZlZWJhYzktOGVlMC00YWI0LTg5MjgtNDNhNTE2NGVmMWFhIiwicm9sZSI6IkFkbWluIiwiZXhwIjoxNzMyNTU4ODU5fQ.ZzyHji3wBi5w7NceRKcbzKM5aySr123mzFmkK1ZBKHQ",
+  "user_id": "f6eebac9-8ee0-4ab4-8928-43a5164ef1aa"
+}
+
 ```
 
 ### GET /profile
@@ -89,7 +101,13 @@ Retrieve the profile of the currently authenticated user.
 Headers:
 
 ```bash
-Authorization: Bearer <token>
+{
+  "created_at": "2024-11-22T04:46:07.287556",
+  "email": "admin2@gmail.com",
+  "id": "f6eebac9-8ee0-4ab4-8928-43a5164ef1aa",
+  "name": "mr",
+  "role": "Admin"
+}
 ```
 
 ### GET /users
