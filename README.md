@@ -104,8 +104,6 @@ Authorization: Bearer <token>
 
 ### 2. Destination Service (Port: 5001)
 
-Manages destination-related operations, including CRUD operations for destinations.
-
 Destination Information:
 Each destination includes:
 
@@ -121,14 +119,14 @@ Response:
 json
 
 ```bash
-[
+
 {
 "id": "int",
 "name": "string",
 "description": "string",
 "location": "string"
 }
-]
+
 ```
 
 ### POST /destinations
