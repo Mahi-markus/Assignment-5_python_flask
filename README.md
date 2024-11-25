@@ -37,17 +37,18 @@ source my_env/bin/activate    # On Linux/MacOS
 my_env\Scripts\activate       # On Windows
 
 ```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
 To make sure the installation worked or not, the line below can be used to check:
 
 ```bash
 pip freeze
 ```
 
-```bash
-3. Install dependencies:
 
-pip install -r requirements.txt
-```
 
 4. Set up .env files:
 Each service folder (user_service, destination_service, auth_service) must have a .env file to store environment variables. Create a .env file in each folder and add the following content:
