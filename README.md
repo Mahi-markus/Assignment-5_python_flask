@@ -25,8 +25,22 @@ This repository contains API's built using **Python Flask** with a microservices
 2. Set up a virtual environment:
 ```bash
 python -m venv my_env
+
+or 
+
+python3 -m venv my_env
+
+```
+```bash
 source my_env/bin/activate    # On Linux/MacOS
 my_env\Scripts\activate       # On Windows
+
+```
+To make sure the installation worked or not, the line below can be used to check:
+
+```bash
+pip freeze
+```
 
 ```
 3. Install dependencies:
@@ -34,7 +48,7 @@ my_env\Scripts\activate       # On Windows
 pip install -r requirements.txt
 ```
 
-Set up .env files:
+4. Set up .env files:
 Each service folder (user_service, destination_service, auth_service) must have a .env file to store environment variables. Create a .env file in each folder and add the following content:
 ```bash
 
