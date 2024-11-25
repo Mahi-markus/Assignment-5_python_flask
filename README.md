@@ -22,13 +22,26 @@ This repository contains API's built using **Python Flask** with a microservices
    ```bash
    cd Assignment-5_python_flask
    ```
-
-   Install dependencies:
-
+2. Set up a virtual environment:
 ```bash
+python -m venv my_env
+source my_env/bin/activate    # On Linux/MacOS
+my_env\Scripts\activate       # On Windows
 
+```
+3. Install dependencies:
+```bash
 pip install -r requirements.txt
 ```
+
+Set up .env files:
+Each service folder (user_service, destination_service, auth_service) must have a .env file to store environment variables. Create a .env file in each folder and add the following content:
+```bash
+
+SECRET_KEY=<your-secret-key>
+```
+
+
 
 Run each service:
 
@@ -36,18 +49,30 @@ Run each service:
 
 ```bash
 python user_service.py
+
+or
+
+python3 user_service.py
 ```
 
 ### Destination Service (Port: 5001):
 
 ```bash
-python destination_service.py
+python destination_service.py 
+
+or
+
+python3 destination_service.py
 ```
 
 ### Authorization Service (Port: 5003):
 
 ```bash
 python auth_service.py
+
+or
+
+python3 auth_service.py
 ```
 
 Access Swagger documentation:
